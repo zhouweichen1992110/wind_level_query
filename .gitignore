@@ -17,9 +17,7 @@ build/
 *.swo
 
 # 输出文件
-*.json
-plots/*.png
-plots/*.jpg
+
 
 # 测试数据（保留测试文件夹结构，但忽略大文件）
 test_data/*.geojson
