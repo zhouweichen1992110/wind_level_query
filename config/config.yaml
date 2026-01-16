@@ -6,7 +6,7 @@ data:
 
 # 查询配置
 query:
-  default_radius_km: null  # 默认搜索半径（千米），null 表示不限制
+  default_radius_km: 700  # 默认搜索半径（千米），null 表示不限制
   distance_threshold_m: 1.0  # 边界点判断阈值（米），距离小于此值认为点在多边形内
 
 # 输出配置
