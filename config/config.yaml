@@ -1,0 +1,25 @@
+# 风浪等级查询系统配置文件
+
+# 数据配置
+data:
+  geojson_path: "test_data/wind_level_18z.geojson"  # 风浪等级 GeoJSON 文件路径
+
+# 查询配置
+query:
+  default_radius_km: null  # 默认搜索半径（千米），null 表示不限制
+  distance_threshold_m: 1.0  # 边界点判断阈值（米），距离小于此值认为点在多边形内
+
+# 输出配置
+output:
+  save_results: true  # 是否自动保存查询结果
+  output_dir: "."  # 结果保存目录
+  decimal_places: 3  # 距离保留小数位数
+
+# 绘图配置
+plot:
+  save_plot: false  # 是否自动保存图片
+  output_dir: "plots"  # 图片保存目录
+  figure_size: [12, 10]  # 图片尺寸（宽, 高），单位英寸
+  dpi: 150  # 图片分辨率
+  format: "png"  # 输出格式 (png/jpg)
+  buffer_ratio: 0.2  # 地图范围缓冲比例

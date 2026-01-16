@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 输出文件
+*.json
+plots/*.png
+plots/*.jpg
+
+# 测试数据（保留测试文件夹结构，但忽略大文件）
+test_data/*.geojson
+test_data/**/*.tif
+test_data/**/*.nc
+
+# 日志
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
