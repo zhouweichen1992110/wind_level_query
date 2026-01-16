@@ -1,0 +1,49 @@
+{
+  "query_point": {
+    "lon": 199.473945,
+    "lat": 24.0147083
+  },
+  "current_level": {
+    "in_polygon": true,
+    "level": 6,
+    "matched_info": {
+      "level": 6,
+      "properties": {
+        "level": 6,
+        "time": 1768510800
+      }
+    }
+  },
+  "level_distances": [
+    {
+      "level": 4,
+      "distance_km": 0.0,
+      "bearing_deg": null
+    },
+    {
+      "level": 5,
+      "distance_km": 0.0,
+      "bearing_deg": null
+    },
+    {
+      "level": 6,
+      "distance_km": 0.0,
+      "bearing_deg": null
+    },
+    {
+      "level": 7,
+      "distance_km": 8.7,
+      "bearing_deg": 0.198
+    },
+    {
+      "level": 8,
+      "distance_km": 1876.056,
+      "bearing_deg": 331.718
+    },
+    {
+      "level": 9,
+      "distance_km": 13337.82,
+      "bearing_deg": 225.853
+    }
+  ]
+}

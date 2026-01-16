@@ -1,0 +1,29 @@
+{
+  "query_point": {
+    "lon": 199.473945,
+    "lat": -4.0147083
+  },
+  "current_level": {
+    "in_polygon": true,
+    "level": 4,
+    "matched_info": {
+      "level": 4,
+      "properties": {
+        "level": 4,
+        "time": 1768510800
+      }
+    }
+  },
+  "level_distances": [
+    {
+      "level": 4,
+      "distance_km": 0.0,
+      "bearing_deg": null
+    },
+    {
+      "level": 5,
+      "distance_km": 169.559,
+      "bearing_deg": 24.697
+    }
+  ]
+}
