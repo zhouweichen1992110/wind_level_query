@@ -1,6 +1,11 @@
 # 风浪等级空间查询系统
 
-基于 GeoPandas 的风浪等级空间查询工具，支持点位等级查询和距离计算。
+基于 GeoPandas 的风浪等级空间查询工具，支持点位等级查询、距离计算及方位角计算。
+
+**数据源与性能**：
+- 默认使用 `test_data/wind_level_18z.parquet` 作为主数据源（Parquet，加载更快）
+- 同时兼容 GeoJSON / Parquet，两种格式接口一致
+- 启用按等级并行计算最近距离与方位角，结合 `radius_km` 参数可显著降低查询耗时
 
 **坐标系统说明**：
 - 输入经度支持 **-180~180** 或 **0~360** 两种模式
@@ -51,6 +56,18 @@ result = query_wind_level(
 print(result)
 # 输出的 query_point["lon"] 为 199.473945 (0~360模式)
 
+# 返回结果示例
+# {
+#   "query_point": {"lon": 199.473945, "lat": -4.0147083},
+#   "current_level": {"in_polygon": true, "level": 4, ...},
+#   "level_distances": [
+#     {"level": 4, "distance_km": 0.0, "bearing_deg": null},      # 点在区域内，角度为null
+#     {"level": 5, "distance_km": 1037.459, "bearing_deg": 0.0}, # 0°=正北
+#     {"level": 6, "distance_km": 3120.784, "bearing_deg": 338.2} # 338°=西北偏北
+#   ]
+# }
+# bearing_deg: 方位角，0°=正北，90°=正东，180°=正南，270°=正西（顺时针）
+
 # 直接使用 0~360 经度
 result = query_wind_level(
     lon=199.473945,  # 支持 0~360
@@ -69,7 +86,7 @@ result = query_wind_level(
 # 单独调用绘图函数
 plot_wind_level_map(
     query_result=result,
-    geojson_path="test_data/wind_level_18z.geojson",
+    geojson_path="test_data/wind_level_18z.parquet",
     output_path="map.png"
 )
 ```

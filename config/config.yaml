@@ -2,7 +2,7 @@
 
 # 数据配置
 data:
-  geojson_path: "test_data/wind_level_18z.geojson"  # 风浪等级 GeoJSON 文件路径
+  geojson_path: "test_data/wind_level_18z.parquet"  # 风浪等级数据文件路径（支持 .geojson 或 .parquet）
 
 # 查询配置
 query:
@@ -12,7 +12,7 @@ query:
 # 输出配置
 output:
   save_results: true  # 是否自动保存查询结果
-  output_dir: "."  # 结果保存目录
+  output_dir: "results"  # 结果保存目录
   decimal_places: 3  # 距离保留小数位数
 
 # 绘图配置

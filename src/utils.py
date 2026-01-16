@@ -39,17 +39,21 @@ def fix_invalid_geometry(geometry):
     return geometry
 
 
-def load_wind_level_gdf(geojson_path: str) -> gpd.GeoDataFrame:
+def load_wind_level_gdf(data_path: str) -> gpd.GeoDataFrame:
     """
-    加载风浪等级 GeoJSON 文件（保持原始 0-360 度经度）
+    加载风浪等级数据文件（支持 GeoJSON 和 Parquet 格式）
     
     Args:
-        geojson_path: GeoJSON 文件路径
+        data_path: 数据文件路径（.geojson 或 .parquet）
         
     Returns:
         GeoDataFrame，CRS 为 EPSG:4326，经度保持 0-360
     """
-    gdf = gpd.read_file(geojson_path)
+    # 根据文件后缀选择加载方式
+    if data_path.endswith('.parquet'):
+        gdf = gpd.read_parquet(data_path)
+    else:
+        gdf = gpd.read_file(data_path)
     
     # 确保 CRS 是 EPSG:4326
     if gdf.crs is None:

@@ -4,8 +4,10 @@
 """
 
 import geopandas as gpd
-from shapely.geometry import Point
-from shapely.ops import unary_union
+from shapely.geometry import Point, box
+from shapely.ops import unary_union, nearest_points
+import math
+from concurrent.futures import ThreadPoolExecutor
 from pyproj import CRS
 from typing import Optional, Dict, List
 
@@ -105,6 +107,73 @@ def query_point_level(lon: float, lat: float, gdf: gpd.GeoDataFrame, distance_th
     }
 
 
+def _calculate_bearing(dx: float, dy: float) -> float:
+    """
+    根据投影坐标差值计算方位角
+    
+    Args:
+        dx: 东西方向差值（正=东）
+        dy: 南北方向差值（正=北）
+        
+    Returns:
+        方位角（度），0°=正北，顺时针增加，范围 [0, 360)
+    """
+    # atan2(dx, dy) 得到以北为0°、顺时针为正的角度
+    angle_rad = math.atan2(dx, dy)
+    angle_deg = math.degrees(angle_rad)
+    # 转换到 [0, 360) 范围
+    if angle_deg < 0:
+        angle_deg += 360
+    return angle_deg
+
+
+def _compute_single_level_distance(
+    level: int,
+    level_gdf: gpd.GeoDataFrame,
+    pt: Point,
+    local_crs: CRS,
+    radius_m: Optional[float],
+    decimal_places: int
+) -> Optional[Dict]:
+    """
+    计算单个等级的距离和方位角（用于并行计算）
+    """
+    if len(level_gdf) == 0:
+        return None
+    
+    try:
+        level_gdf_proj = level_gdf.to_crs(local_crs)
+        level_gdf_proj['geometry'] = level_gdf_proj['geometry'].apply(fix_invalid_geometry)
+        
+        pt_gdf = gpd.GeoDataFrame(geometry=[pt], crs="EPSG:4326")
+        pt_proj = pt_gdf.to_crs(local_crs).geometry.iloc[0]
+        
+        geom_union = unary_union(level_gdf_proj.geometry)
+        
+        dist_m = pt_proj.distance(geom_union)
+        
+        if radius_m is not None and dist_m > radius_m:
+            return None
+        
+        dist_km = dist_m / 1000.0
+        
+        bearing_deg = None
+        if dist_m > 1e-6:
+            p_query, p_near = nearest_points(pt_proj, geom_union)
+            dx = p_near.x - p_query.x
+            dy = p_near.y - p_query.y
+            bearing_deg = round(_calculate_bearing(dx, dy), decimal_places)
+        
+        return {
+            "level": int(level),
+            "distance_km": round(dist_km, decimal_places),
+            "bearing_deg": bearing_deg
+        }
+    except Exception as e:
+        print(f"Warning: Failed to project level {level}: {e}")
+        return None
+
+
 def query_level_min_distance(
     lon: float, 
     lat: float, 
@@ -113,7 +182,7 @@ def query_level_min_distance(
     decimal_places: int = 3
 ) -> List[Dict]:
     """
-    计算给定点到各风浪等级区域的最近距离
+    计算给定点到各风浪等级区域的最近距离及方位角（并行计算）
     
     Args:
         lon: 经度 (0~360)
@@ -124,13 +193,14 @@ def query_level_min_distance(
         
     Returns:
         [
-            {"level": int, "distance_km": float},
+            {"level": int, "distance_km": float, "bearing_deg": float or None},
             ...
         ]
         按 level 升序排列
+        bearing_deg: 从查询点指向该等级最近位置的方位角（度）
+                     0°=正北，90°=正东，180°=正南，270°=正西
+                     若 distance_km=0（点在该等级区域内），则为 None
     """
-    from shapely.geometry import box
-    
     pt = Point(lon, lat)
     
     # 构造以查询点为中心的方位等距投影（单位：米）
@@ -140,12 +210,10 @@ def query_level_min_distance(
     # 获取所有 level 值
     levels = sorted(gdf['level'].dropna().unique())
     
-    results = []
     radius_m = radius_km * 1000 if radius_km is not None else None
     
     # 如果设置了半径，提前粗筛选（使用 bbox 过滤）
     if radius_km is not None:
-        # 1.5倍安全系数，避免漏掉边界数据
         buffer_deg = (radius_km * 1.5) / 111.0
         bbox_filter = box(lon - buffer_deg, lat - buffer_deg, 
                          lon + buffer_deg, lat + buffer_deg)
@@ -153,41 +221,26 @@ def query_level_min_distance(
     else:
         gdf_filtered = gdf
     
-    for level in levels:
-        # 该等级的所有多边形
-        level_gdf = gdf_filtered[gdf_filtered['level'] == level].copy()
-        if len(level_gdf) == 0:
-            continue
-        
-        # 分别投影
-        try:
-            level_gdf_proj = level_gdf.to_crs(local_crs)
-            # 投影后修复无效几何
-            level_gdf_proj['geometry'] = level_gdf_proj['geometry'].apply(fix_invalid_geometry)
-            
-            pt_gdf = gpd.GeoDataFrame(geometry=[pt], crs="EPSG:4326")
-            pt_proj = pt_gdf.to_crs(local_crs).geometry.iloc[0]
-            
-            geom_union = unary_union(level_gdf_proj.geometry)
-            
-            # 计算距离（米）
-            dist_m = pt_proj.distance(geom_union)
-            
-            # 如果设置了半径限制，且超出范围，跳过
-            if radius_m is not None and dist_m > radius_m:
-                continue
-            
-            dist_km = dist_m / 1000.0
-            
-            results.append({
-                "level": int(level),
-                "distance_km": round(dist_km, decimal_places)
-            })
-        except Exception as e:
-            # 投影失败（可能是跨日界线问题），跳过该等级
-            print(f"Warning: Failed to project level {level}: {e}")
-            continue
+    # 按等级分组
+    level_gdfs = {level: gdf_filtered[gdf_filtered['level'] == level].copy() 
+                  for level in levels}
     
+    # 并行计算各等级
+    results = []
+    with ThreadPoolExecutor(max_workers=len(levels)) as executor:
+        futures = {
+            executor.submit(
+                _compute_single_level_distance,
+                level, level_gdfs[level], pt, local_crs, radius_m, decimal_places
+            ): level for level in levels
+        }
+        for future in futures:
+            result = future.result()
+            if result is not None:
+                results.append(result)
+    
+    # 按 level 排序
+    results.sort(key=lambda x: x['level'])
     return results
 
 
@@ -219,9 +272,9 @@ def query_wind_level_info(
                 "matched_info": dict or None
             },
             "level_distances": [
-                {"level": int, "distance_km": float},
+                {"level": int, "distance_km": float, "bearing_deg": float or None},
                 ...
-            ]
+            ]  # bearing_deg: 方位角，0°=正北，顺时针增加；点在区域内时为None
         }
     """
     # 使用缓存（首次加载后缓存，后续查询直接使用）
